@@ -1,7 +1,5 @@
 <?php
-global $vicomi_api;
-
-require(ABSPATH . 'wp-includes/version.php');
+global $vicomi_comments_api;
 
 if ( !current_user_can('moderate_comments') ) {
     die();
@@ -14,7 +12,7 @@ if ( !function_exists('wp_nonce_field') ) {
 // if reset request
 if ( isset($_POST['reset']) ) {
 	
-	foreach ( array('vicomi_replace', 'vicomi_active', 'vicomi_api_key', 'vicomi_version') as $option ) {
+	foreach ( array('vicomi_comments_replace', 'vicomi_comments_active', 'vicomi_comments_api_key', 'vicomi_comments_version') as $option ) {
 		delete_option($option);
 	}
     unset($_POST);
@@ -22,112 +20,175 @@ if ( isset($_POST['reset']) ) {
 	?>
 	<div class="wrap">
 		<h2>Vicomi Reset</h2>
-		<p>Vicomi has been reset successfully. You can <a href="?page=vicomi&amp;phase=1">reinstall</a> this plugin.</p>
+		<p>Vicomi has been reset successfully. You can <a href="?page=vicomi-comments&amp;phase=1">reinstall</a> this plugin.</p>
 	</div>
 	<?php
 	die();
 }
 
-// Clean params
-if(isset($_POST['vc_un'])) {
-    $_POST['vc_un'] = stripslashes($_POST['vc_un']);
-	$_POST['vc_un'] = strip_tags($_POST['vc_un']);
-}
-
-if(isset($_POST['vc_ps'])) {
-    $_POST['vc_ps'] = stripslashes($_POST['vc_ps']);
-}
-
 // set if vicomi plugin is active
 if (isset($_GET['active'])) {
-    update_option('vicomi_active', ($_GET['active'] == '1' ? '1' : '0'));
+    update_option('vicomi_comments_active', ($_GET['active'] == '1' ? '1' : '0'));
+}
+
+// api key update
+if ( isset($_POST['vc_api_key']) ) {
+    $key = $_POST['vc_api_key'];
+    $key = stripslashes($key);
+    $key = strip_tags($key);
+
+    if($key != null && $key != "") {
+
+        update_option('vicomi_comments_replace', 'all');
+        update_option('vicomi_comments_api_key', $key);
+    }
 }
 
 // init vicomi api key
-$vicomi_api_key = isset($_POST['vicomi_api_key']) ? strip_tags($_POST['vicomi_api_key']) : null;
+//$vicomi_api_key = isset($_POST['vicomi_api_key']) ? strip_tags($_POST['vicomi_api_key']) : null;
 
-$phase = @intval($_GET['phase']);
-if($phase == 2 && !isset($_POST['vc_un'])) $phase = 1;
-$phase = (vicomi_is_installed()) ? 0 : ($phase ? $phase : 1);
 
-if ($phase == 2 && isset($_POST['vc_un']) && isset($_POST['vc_ps']) ) {
-    $vicomi_api_key = $vicomi_api->get_user_api_key($_POST['vc_un'], $_POST['vc_ps']);
-    if ( $vicomi_api_key < 0 || !$vicomi_api_key ) {
-        $phase = 1;
-        vicomi_manage_dialog($vicomi_api->get_last_error(), true);
-    }
+$login_url = 'http://cms.vicomi.com?platform=wordpress&wt=0&uid='.get_option('vicomi_comments_uuid');
+$moderation_url = 'http://dashboard.vicomi.com/';
+//$login_url = 'http://localhost:9002?platform=wordpress&wt=0&uid='.get_option('vicomi_comments_uuid');
+//$moderation_url = 'http://localhost:9000/';
 
-    if ( $phase == 2 ) {
-		update_option('vicomi_replace', 'all');
-		update_option('vicomi_api_key', $vicomi_api_key);
-    }
+if (vicomi_comments_is_installed()) {
+    $current_url = $moderation_url;
+} else {
+    $current_url = $login_url;
 }
 
 ?>
 <div class="wrap">
-	<div class="vicomi-header">
-		<div class="vicomi-menu">
-			<span rel="vicomi-page" class="selected"><?php echo (vicomi_is_installed() ? 'Moderate' : 'Install'); ?></span>
-			<span rel="vicomi-settings">Settings</span>
+
+	<div class="vicomi-comments-header">
+		<div class="vicomi-comments-menu">
+			<span rel="vicomi-comments-page" class="selected"><?php echo (vicomi_comments_is_installed() ? 'Dashboard' : 'Install'); ?></span>
+            <?php if (vicomi_comments_is_installed()) { ?>
+                <span rel="vicomi-comments-settings">Settings</span>
+            <?php } ?>
 		</div>
 	</div>
-    <div class="vicomi-content">
-    <?php
-	if($phase == 0) {
-		$mod_url = 'http://dashboard.vicomi.com/';
-		?>
-		<div class="vicomi-page">
-            <h2>Vicomi Moderation</h2>
-            <iframe src="<?php echo $mod_url ?>" style="width: 100%; height: 80%; min-height: 600px;"></iframe>
-        </div>		
-<?php } else if($phase == 1) { ?>
-		<div class="vicomi-page">
-            <h2>Install Vicomi</h2>
-			<p>In order to activate Vicomi comment platform you need to have a Vicomi moderation account.</p>
-			<p>Please fill in the fields below with your account credentials.</p>
-			<p>If you don't have one, click <a href="http://vicomi.com" target="_blank">here</a> to create.</p>
-			
-            <form method="POST" action="?page=vicomi&amp;phase=2">
-            <?php wp_nonce_field('vicomi-install-1'); ?>
-			<div class="form-section">
-				<label for="vc_un" style="display:block">Email</label>
-				<input type="text" id="vc_un" name="vc_un" tabindex="1" />
-			</div>
-			<div class="form-section">
-				<label for="vc_ps" style="display:block">Password</label>
-				<input type="password" id="vc_ps" name="vc_ps" tabindex="2">
-			</div>
 
-            <input name="submit" type="submit" class="vicomi-btn" value="Next &raquo;" tabindex="3" style="margin-top:10px;">
+    <div class="vicomi-comments-content">
+
+         <div class="vicomi-comments-page">
+            <iframe src="<?php echo $current_url ?>" style="width: 100%; height: 80%; min-height: 600px;"></iframe>
+            <form method="POST" action="?page=vicomi-comments" style="display:none;" name="vicomiForm" id="vicomiForm">
+                <?php wp_nonce_field('vicomi-comments-install-1'); ?>
             </form>
-        </div>
-<?php } else if($phase == 2) { ?>	
-		 <div class="vicomi-page">
-            <h2>Install Vicomi</h2>
-            <p>Vicomi has been installed successfully. <a href="edit-comments.php?page=vicomi"> Continue to the moderation dashboard &gt</a></p>
-        </div>
-<?php	} ?>
-        
+        </div>  
+
     </div>
 
     <!-- Settings -->
-    <div class="vicomi-content vicomi-settings" style="display:none">
+    <div class="vicomi-comments-content vicomi-comments-settings" style="display:none">
         <h2>Settings</h2>
-        <p>Version: <?php echo VICOMI_V; ?></p>
+        <p>Version: <?php echo VICOMI_COMMENTS_V; ?></p>
         <?php
-        if (get_option('vicomi_active') === '0') {
-            echo '<p class="status">Vicomi comments are currently disabled. (<a href="?page=vicomi&amp;active=1">Enable</a>)</p>';
+        if (get_option('vicomi_comments_active') === '0') {
+            echo '<p class="status">Vicomi comments are currently disabled. (<a href="?page=vicomi-comments&amp;active=1">Enable</a>)</p>';
         } else {
-            echo '<p class="status">Vicomi comments are currently enabled. (<a href="?page=vicomi&amp;active=0">Disable</a>)</p>';
+            echo '<p class="status">Vicomi comments are currently enabled. (<a href="?page=vicomi-comments&amp;active=0">Disable</a>)</p>';
         }
         ?>
         <form method="POST" enctype="multipart/form-data">
-        <?php wp_nonce_field('vicomi-settings'); ?>
+        <?php wp_nonce_field('vicomi-comments-settings'); ?>
 
-        <form action="?page=vicomi" method="POST">
-			<?php wp_nonce_field('vicomi-reset'); ?>
+        <form action="?page=vicomi-comments" method="POST">
+			<?php wp_nonce_field('vicomi-comments-reset'); ?>
 			<input type="submit" value="Reset Vicomi" name="reset" onclick="return confirm('Are you sure you want to reset the Vicomi plugin?')" class="button" /> This removes all Vicomi settings.
 		</form>
 
     </div>
+
 </div>
+
+<script>
+/***********************************
+ * Post Message
+ **********************************/
+ window.vcPostMessageService = new VCPostMessageService();
+
+window.vcPostMessageService.listen(function(e) {
+
+    var api_key_message_prefix = "vicomi:cms:apikey:";
+    var finish_message_prefix = "vicomi:cms:finish";
+    var api_key_and_finish_message_prefix = "vicomi:cms:apikeyfinish:";
+
+    if(e.data.indexOf(api_key_message_prefix) > -1) {
+
+        var apiKey = e.data.replace(api_key_message_prefix, "");
+        updateApiKey(apiKey, false);
+    }
+
+    if(e.data.indexOf(finish_message_prefix) > -1) {
+
+        reload();
+    }
+
+    if(e.data.indexOf(api_key_and_finish_message_prefix) > -1) {
+
+        var apiKey = e.data.replace(api_key_and_finish_message_prefix, "");
+        updateApiKey(apiKey, true);
+    }
+
+ });
+
+function updateApiKey(apiKey, doReload) {
+
+    // submit form
+    jQuery.ajax({
+        type: "POST",
+        url: "?page=vicomi-comments",
+        data: {vc_api_key: apiKey},
+        cache: false,
+        success: function(result){
+            if(doReload) {
+                reload();
+            }
+        }
+    });
+}
+
+function reload() {
+    jQuery('#vicomiForm').submit();
+}
+
+function VCPostMessageService() {
+
+    var _origin = "";
+    var _listener;
+
+    return {
+
+        listen: function(listener) {
+            _listener = listener;
+            if (window.addEventListener) {
+                window.addEventListener('message', this.postMessageListener);
+            }
+            else { // IE8 or earlier
+                window.attachEvent('onmessage', this.postMessageListener);
+            }
+
+        },
+
+        setOrigin: function(org) {
+            _origin = org;
+        },
+
+        postMessage: function(msg, target) {
+            if(_origin != null && _origin != "") {
+                target.postMessage(msg, _origin);
+            }
+
+        },
+
+        postMessageListener: function(e) {
+            _listener(e);
+        }
+    }
+}
+</script>
+
